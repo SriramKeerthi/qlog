@@ -1,0 +1,10 @@
+target/
+sample-project/
+bin/
+logs/
+log/
+*.classpath
+*.project
+*.prefs
+.metadata/
+dependency-reduced-pom.xml
