@@ -1,101 +1,72 @@
 package com.raremile.qlog;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.raremile.qlog.engine.Handler;
+import com.raremile.qlog.exceptions.PropertyDoesNotExist;
 import com.raremile.qlog.helper.CommonConstants;
-import com.raremile.qlog.helper.GlobalConfigurations;
+import com.raremile.qlog.helper.Configurations;
 
 
 public class QLog
 {
-    private static Map<String, Map<String, Object>> configurations;
+
+    private static Map<String, Handler> handlers = new HashMap<String, Handler>();
 
 
-    public static void main( String[] args ) throws IOException
+    public QLog()
     {
-        GlobalConfigurations.initialize( loadGlobals() );
-        configurations = loadConfigs();
-        for ( String handlerName : configurations.keySet() ) {
-            new Handler( handlerName, configurations.get( handlerName ) ).start();
+        checkPreConditions();
+    }
+
+
+    private void checkPreConditions()
+    {
+        String[] propertiesToCheck = { CommonConstants.APPLICATION.HANDLERS, CommonConstants.APPLICATION.LINES_AFTER,
+            CommonConstants.APPLICATION.LINES_BEFORE };
+        for ( String property : propertiesToCheck ) {
+            if ( Configurations.getObject( property ) == null ) {
+                throw new PropertyDoesNotExist( "Property " + property + " must be defined" );
+            }
         }
     }
 
 
-    @SuppressWarnings ( "unchecked")
-    private static Map<String, Object> loadGlobals() throws IOException
+    public void addHandler( String handlerName, Handler handler )
     {
-        Map<String, Object> configurations = new HashMap<String, Object>();
-        BufferedReader br = new BufferedReader( new InputStreamReader( new FileInputStream( CommonConstants.CONFIG_FILE ) ) );
-        String line = null;
-        while ( ( line = br.readLine().trim() ) != null ) {
-            if ( !line.startsWith( "global." ) ) {
-                continue;
-            }
-            int split = line.indexOf( '=' );
-            if ( split < 1 ) {
-                continue;
-            }
-            String key = line.substring( 0, split ).trim();
-            String value = line.substring( split + 1 ).trim();
-            if ( configurations.containsKey( key ) ) {
-                if ( configurations.get( key ) instanceof String ) {
-                    List<String> values = new ArrayList<String>();
-                    values.add( (String) configurations.get( key ) );
-                    configurations.put( key, values );
-                }
-                ( (List<String>) configurations.get( key ) ).add( value );
-            } else {
-                configurations.put( key, value );
-            }
-        }
-        br.close();
-        return configurations;
+        handlers.put( handlerName, handler );
     }
 
 
-    @SuppressWarnings ( "unchecked")
-    private static Map<String, Map<String, Object>> loadConfigs() throws IOException
+    public boolean startHandler( String handlerName )
     {
-        Map<String, Map<String, Object>> configurations = new HashMap<String, Map<String, Object>>();
-        BufferedReader br = new BufferedReader( new InputStreamReader( new FileInputStream( CommonConstants.CONFIG_FILE ) ) );
-        String line = null;
-        while ( ( line = br.readLine().trim() ) != null ) {
-            if ( line.startsWith( "#" ) || line.startsWith( "global." ) ) {
-                continue;
-            }
-            int split = line.indexOf( '.' );
-            if ( split < 1 ) {
-                continue;
-            }
-            String handlerName = line.substring( 0, split ).trim();
-            if ( !configurations.containsKey( handlerName ) ) {
-                configurations.put( handlerName, new HashMap<String, Object>() );
-            }
-            Map<String, Object> handlerConfigurations = configurations.get( handlerName );
-            line = line.substring( split + 1 ).trim();
-            split = line.indexOf( '=' );
-            String key = line.substring( 0, split ).trim();
-            String value = line.substring( split + 1 ).trim();
-            if ( handlerConfigurations.containsKey( key ) ) {
-                if ( handlerConfigurations.get( key ) instanceof String ) {
-                    List<String> values = new ArrayList<String>();
-                    values.add( (String) handlerConfigurations.get( key ) );
-                    handlerConfigurations.put( key, values );
-                }
-                ( (List<String>) handlerConfigurations.get( key ) ).add( value );
-            } else {
-                handlerConfigurations.put( key, value );
-            }
+        if ( handlers.containsKey( handlerName ) ) {
+            handlers.get( handlerName ).start();
+            return true;
         }
-        br.close();
-        return configurations;
+        return false;
+    }
+
+
+    public void stopHandler( String handlerName )
+    {
+        if ( handlers.containsKey( handlerName ) ) {
+            handlers.get( handlerName ).stopHandler();
+        }
+    }
+
+
+    public static void main( String[] args ) throws IOException, InterruptedException
+    {
+        QLog qlog = new QLog();
+
+        List<String> handlers = Configurations.getStringOrList( CommonConstants.APPLICATION.HANDLERS );
+        for ( String handlerName : handlers ) {
+            qlog.addHandler( handlerName, new Handler( handlerName ) );
+            qlog.startHandler( handlerName );
+        }
     }
 }

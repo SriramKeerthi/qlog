@@ -1,92 +1,146 @@
 package com.raremile.qlog.engine;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.List;
-import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.apache.commons.io.input.Tailer;
+import org.apache.commons.io.input.TailerListenerAdapter;
 
 import com.raremile.qlog.entities.LogBuffer;
+import com.raremile.qlog.exceptions.PropertyDoesNotExist;
 import com.raremile.qlog.helper.CommonConstants;
-import com.raremile.qlog.helper.GlobalConfigurations;
+import com.raremile.qlog.helper.Configurations;
 
 
 public class Handler extends Thread
 {
     private String handlerName;
-    private Map<String, Object> handlerConfiguration;
+    private Pattern regex;
+    private String startsWith;
+    private String endsWith;
 
 
-    public Handler( String handlerName, Map<String, Object> handlerConfiguration )
+    private LogBuffer logBuffer;
+    private volatile boolean stopProcessing;
+
+
+    public Handler( String handlerName ) throws PropertyDoesNotExist
     {
-        super( handlerName );
         this.handlerName = handlerName;
-        this.handlerConfiguration = handlerConfiguration;
+        checkPreConditions();
+        if ( this.getHandlerProperty( CommonConstants.HANDLER.REGEX ) != null ) {
+            this.regex = Pattern.compile( this.getHandlerProperty( CommonConstants.HANDLER.REGEX ) );
+        }
+
+        if ( this.getHandlerProperty( CommonConstants.HANDLER.STARTS_WITH ) != null ) {
+            this.startsWith = this.getHandlerProperty( CommonConstants.HANDLER.STARTS_WITH );
+        }
+
+        if ( this.getHandlerProperty( CommonConstants.HANDLER.ENDS_WITH ) != null ) {
+            this.endsWith = this.getHandlerProperty( CommonConstants.HANDLER.ENDS_WITH );
+        }
+
+        logBuffer = new LogBuffer( Configurations.getInt( CommonConstants.APPLICATION.LINES_AFTER )
+            + Configurations.getInt( CommonConstants.APPLICATION.LINES_BEFORE ) + 1 );
     }
 
 
-    @SuppressWarnings ( "unchecked")
+    private void checkPreConditions() throws PropertyDoesNotExist
+    {
+        String[] propertiesToCheck = { CommonConstants.HANDLER.LOG_FILE, CommonConstants.HANDLER.EMAIL };
+        for ( String property : propertiesToCheck ) {
+            if ( this.getObjectHandlerProperty( property ) == null ) {
+                throw new PropertyDoesNotExist( "Property " + this.handlerName + "." + property + " must be defined" );
+            }
+        }
+    }
+
+
     @Override
     public void run()
     {
-        int linesBefore = GlobalConfigurations.linesBefore();
-        int linesAfter = GlobalConfigurations.linesAfter();
-        LogBuffer logBuffer = new LogBuffer( linesBefore + linesAfter + 1 );
-        try {
-            long waitTimeout = 1000 * 60 * 60 * 24; // One day
-            if ( handlerConfiguration.containsKey( CommonConstants.WAIT_TIMEOUT ) ) {
-                waitTimeout = Long.parseLong( (String) handlerConfiguration.get( CommonConstants.WAIT_TIMEOUT ) );
-            }
-            File logFile = new File( (String) handlerConfiguration.get( CommonConstants.LOG_FILE_NAME ) );
-            BufferedReader br = new BufferedReader( new InputStreamReader( new FileInputStream( logFile ) ) );
-            long lastMessageTime = System.currentTimeMillis();
-            boolean timedOut = false;
-            boolean exceptionFound = false;
-            int linesLeft = linesAfter + 1;
-            while ( true ) {
-                while ( !br.ready() ) {
-                    sleep( 100 );
-                    if ( System.currentTimeMillis() - lastMessageTime > waitTimeout ) {
-                        timedOut = true;
-                        break;
-                    }
-                }
-                if ( timedOut ) {
-                    break;
-                }
-                lastMessageTime = System.currentTimeMillis();
-                String log = br.readLine();
-                logBuffer.addLine( log );
-                linesLeft--;
-                if ( matches( log ) ) {
-                    exceptionFound = true;
-                    linesLeft = linesAfter;
-                }
-                if ( linesLeft == 0 && exceptionFound ) {
-                    exceptionFound = false;
-                    if ( handlerConfiguration.get( CommonConstants.EMAIL ) instanceof String ) {
-                        SendMail.sendMail( handlerName,
-                            new String[] { (String) handlerConfiguration.get( CommonConstants.EMAIL ) }, logBuffer.getLines() );
-                    } else {
-                        SendMail.sendMail( handlerName,
-                            ( (List<String>) handlerConfiguration.get( CommonConstants.EMAIL ) ).toArray( new String[] {} ),
-                            logBuffer.getLines() );
-                    }
-                }
-            }
-            br.close();
-        } catch ( IOException e ) {
-            e.printStackTrace();
-        } catch ( InterruptedException e ) {
-            e.printStackTrace();
+        Tailer tailer = Tailer.create( new File( this.getHandlerProperty( CommonConstants.HANDLER.LOG_FILE ) ),
+            new LogListener(), 500 );
+        while ( !stopProcessing ) {
+
         }
+        tailer.stop();
     }
 
 
     private boolean matches( String log )
     {
-        return false;
+        boolean matches = false;
+
+        if ( this.regex != null ) {
+            matches |= this.regex.matcher( log ).matches();
+        }
+
+        if ( this.startsWith != null ) {
+            matches |= log.startsWith( startsWith );
+        }
+
+        if ( this.endsWith != null ) {
+            matches |= log.endsWith( endsWith );
+        }
+
+        return matches;
+    }
+
+
+    private String getHandlerProperty( String property )
+    {
+        return Configurations.getString( this.handlerName + "." + property );
+    }
+
+
+    private List<String> getListHandlerProperty( String property )
+    {
+        return Configurations.getStringOrList( this.handlerName + "." + property );
+    }
+
+
+    private Object getObjectHandlerProperty( String property )
+    {
+        return Configurations.getObject( this.handlerName + "." + property );
+    }
+
+
+    /**
+     * 
+     * Class that listens to Logs and processes it line by line
+     * @author Samarth Bhargav
+     *
+     */
+    private class LogListener extends TailerListenerAdapter
+    {
+
+        private int linesLeft = Configurations.getInt( CommonConstants.APPLICATION.LINES_AFTER ) + 1;
+        private boolean exceptionFound = false;
+
+
+        @Override
+        public void handle( String log )
+        {
+            logBuffer.addLine( log );
+            linesLeft--;
+            if ( matches( log ) ) {
+                exceptionFound = true;
+                linesLeft = Configurations.getInt( CommonConstants.APPLICATION.LINES_AFTER ) + 1;
+            }
+            if ( linesLeft == 0 && exceptionFound ) {
+                exceptionFound = false;
+                SendMail.sendMail( handlerName,
+                    ( getListHandlerProperty( CommonConstants.HANDLER.EMAIL ) ).toArray( new String[] {} ),
+                    logBuffer.getLines() );
+            }
+        }
+    }
+
+
+    public void stopHandler()
+    {
+        this.stopProcessing = true;
     }
 }

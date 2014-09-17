@@ -1,6 +1,5 @@
 package com.raremile.qlog.engine;
 
-import java.util.Arrays;
 import java.util.Properties;
 
 import javax.mail.Authenticator;
@@ -13,7 +12,6 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
 import com.raremile.qlog.helper.CommonConstants;
-
 
 
 public class SendMail
@@ -33,26 +31,22 @@ public class SendMail
         Session session = Session.getInstance( properties, new Authenticator() {
             protected PasswordAuthentication getPasswordAuthentication()
             {
-                return new PasswordAuthentication( "sriram@raremile.com", "password" );
+                return new PasswordAuthentication( "qloglogger@gmail.com", "password" );
             }
         } );
 
         try {
-            // Create a default MimeMessage object.
             MimeMessage message = new MimeMessage( session );
 
-            // Set From: header field of the header.
-            //            message.setFrom( new InternetAddress( GlobalConfigurations.email() ) );
-            message.setFrom( new InternetAddress( "sriram@raremile.com" ) );
+            message.setFrom( new InternetAddress( "qloglogger@gmail.com" ) );
 
-            // Set To: header field of the header.
             for ( String recepient : recepients ) {
                 message.addRecipient( Message.RecipientType.TO, new InternetAddress( recepient ) );
             }
 
             message.setSubject( "Exception in " + handlerName );
 
-            message.setContent( String.format( CommonConstants.EXCEPTION_BODY, Arrays.toString( lines ) ), "text/html" );
+            message.setContent( String.format( CommonConstants.EXCEPTION_BODY, formatStringArray( lines ) ), "text/html" );
 
             Transport.send( message );
         } catch ( MessagingException mex ) {
@@ -61,8 +55,12 @@ public class SendMail
     }
 
 
-    public static void main( String[] args )
+    private static String formatStringArray( String[] lines )
     {
-        sendMail( "Test", new String[] { "shramk@gmail.com" }, new String[] { "Line 1", "Line 2" } );
+        StringBuilder builder = new StringBuilder();
+        for ( String line : lines ) {
+            builder.append( line + "<br>" );
+        }
+        return builder.toString();
     }
 }
