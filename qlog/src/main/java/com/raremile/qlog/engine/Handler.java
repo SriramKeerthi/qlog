@@ -48,7 +48,7 @@ public class Handler extends Thread
 
     private void checkPreConditions() throws PropertyDoesNotExist
     {
-        String[] propertiesToCheck = { CommonConstants.HANDLER.LOG_FILE, CommonConstants.HANDLER.EMAIL };
+        String[] propertiesToCheck = { CommonConstants.HANDLER.LOG_FILE };
         for ( String property : propertiesToCheck ) {
             if ( this.getObjectHandlerProperty( property ) == null ) {
                 throw new PropertyDoesNotExist( "Property " + this.handlerName + "." + property + " must be defined" );
@@ -131,9 +131,13 @@ public class Handler extends Thread
             }
             if ( linesLeft == 0 && exceptionFound ) {
                 exceptionFound = false;
-                SendMail.sendMail( handlerName,
-                    ( getListHandlerProperty( CommonConstants.HANDLER.EMAIL ) ).toArray( new String[] {} ),
-                    logBuffer.getLines() );
+                List<String> toEmails = null;
+                if ( getObjectHandlerProperty( CommonConstants.HANDLER.EMAIL ) == null ) {
+                    toEmails = Configurations.getStringOrList( CommonConstants.GLOBAL.EMAILS );
+                } else {
+                    toEmails = getListHandlerProperty( CommonConstants.HANDLER.EMAIL );
+                }
+                SendMail.sendMail( handlerName, ( toEmails ).toArray( new String[] {} ), logBuffer.getLines() );
             }
         }
     }

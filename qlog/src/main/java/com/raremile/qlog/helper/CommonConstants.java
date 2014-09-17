@@ -14,6 +14,17 @@ public class CommonConstants
         public static final String LINES_BEFORE = "application.lines.before";
         public static final String LINES_AFTER = "application.lines.after";
         public static final String CONFIG_FILE = "qlog.conf";
+        public static final String EMAIL = "application.email.address";
+        public static final String PASSWORD = "application.email.password";
+    }
+
+
+    /**
+     * Global Handler Properties    
+     */
+    public static class GLOBAL
+    {
+        public static final String EMAILS = "global.emails";
     }
 
 

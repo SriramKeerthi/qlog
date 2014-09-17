@@ -12,6 +12,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
 import com.raremile.qlog.helper.CommonConstants;
+import com.raremile.qlog.helper.Configurations;
 
 
 public class SendMail
@@ -31,14 +32,15 @@ public class SendMail
         Session session = Session.getInstance( properties, new Authenticator() {
             protected PasswordAuthentication getPasswordAuthentication()
             {
-                return new PasswordAuthentication( "qloglogger@gmail.com", "password" );
+                return new PasswordAuthentication( Configurations.getString( CommonConstants.APPLICATION.EMAIL ),
+                    Configurations.getString( CommonConstants.APPLICATION.PASSWORD ) );
             }
         } );
 
         try {
             MimeMessage message = new MimeMessage( session );
 
-            message.setFrom( new InternetAddress( "qloglogger@gmail.com" ) );
+            message.setFrom( new InternetAddress( Configurations.getString( CommonConstants.APPLICATION.EMAIL ) ) );
 
             for ( String recepient : recepients ) {
                 message.addRecipient( Message.RecipientType.TO, new InternetAddress( recepient ) );
