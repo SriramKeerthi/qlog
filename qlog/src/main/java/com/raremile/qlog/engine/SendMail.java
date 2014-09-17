@@ -31,7 +31,7 @@ public class SendMail
         Session session = Session.getInstance( properties, new Authenticator() {
             protected PasswordAuthentication getPasswordAuthentication()
             {
-                return new PasswordAuthentication( "qloglogger@gmail.com", "qlogloggerisawesome" );
+                return new PasswordAuthentication( "qloglogger@gmail.com", "password" );
             }
         } );
 
