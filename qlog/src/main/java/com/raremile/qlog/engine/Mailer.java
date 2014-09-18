@@ -11,12 +11,21 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.raremile.qlog.exceptions.MailingException;
 import com.raremile.qlog.helper.CommonConstants;
+import com.raremile.qlog.helper.Configurations;
 
 
-public class SendMail
+public class Mailer
 {
+
+    private static final Logger LOG = LoggerFactory.getLogger( Mailer.class );
+
     private static Properties properties;
+
     static {
         properties = new Properties();
         properties.put( "mail.smtp.auth", "true" );
@@ -25,23 +34,26 @@ public class SendMail
         properties.put( "mail.smtp.port", "587" );
     }
 
+    private Session session = Session.getInstance( properties, new Authenticator() {
+        protected PasswordAuthentication getPasswordAuthentication()
+        {
+            return new PasswordAuthentication( Configurations.getString( CommonConstants.APPLICATION.EMAIL ), Configurations
+                .getString( CommonConstants.APPLICATION.PASSWORD ) );
+        }
+    } );
 
-    public static void sendMail( String handlerName, String[] recepients, String[] lines )
+
+    public void sendMail( String handlerName, String[] recepients, String[] lines ) throws MailingException
     {
-        Session session = Session.getInstance( properties, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication()
-            {
-                return new PasswordAuthentication( "qloglogger@gmail.com", "password" );
-            }
-        } );
 
         try {
             MimeMessage message = new MimeMessage( session );
 
-            message.setFrom( new InternetAddress( "qloglogger@gmail.com" ) );
+            message.setFrom( new InternetAddress( Configurations.getString( CommonConstants.APPLICATION.EMAIL ) ) );
 
             for ( String recepient : recepients ) {
                 message.addRecipient( Message.RecipientType.TO, new InternetAddress( recepient ) );
+                LOG.info( "{}: Sending Mail", recepient );
             }
 
             message.setSubject( "Exception in " + handlerName );
@@ -49,8 +61,9 @@ public class SendMail
             message.setContent( String.format( CommonConstants.EXCEPTION_BODY, formatStringArray( lines ) ), "text/html" );
 
             Transport.send( message );
+            LOG.info( "{}: Sent Mail", handlerName );
         } catch ( MessagingException mex ) {
-            mex.printStackTrace();
+            throw new MailingException( mex );
         }
     }
 

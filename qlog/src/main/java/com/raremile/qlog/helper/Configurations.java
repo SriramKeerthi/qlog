@@ -7,6 +7,9 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -18,8 +21,10 @@ import com.typesafe.config.ConfigFactory;
 public class Configurations
 {
 
+    private static final Logger LOG = LoggerFactory.getLogger( Configurations.class );
+
     static {
-        reload(); // TODO Make it configurable
+        reload();
     }
 
 
@@ -91,6 +96,11 @@ public class Configurations
     }
 
 
+    /**
+     * Return the value of <b>propertyName</b>. null is returned if property does not exist.
+     * @param propertyName
+     * @return
+     */
     public static Object getObject( String propertyName )
     {
         if ( config.hasPath( propertyName ) ) {
@@ -105,6 +115,7 @@ public class Configurations
      **/
     public static void reload()
     {
+        LOG.info( "Reloading Config" );
         ConfigFactory.invalidateCaches();
         Config originalConfig = ConfigFactory.load();
         // TODO Pick path from Sytem Property

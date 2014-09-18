@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.raremile.qlog.engine.Handler;
 import com.raremile.qlog.exceptions.PropertyDoesNotExist;
 import com.raremile.qlog.helper.CommonConstants;
@@ -13,6 +16,8 @@ import com.raremile.qlog.helper.Configurations;
 
 public class QLog
 {
+
+    private static Logger LOG = LoggerFactory.getLogger( QLog.class );
 
     private static Map<String, Handler> handlers = new HashMap<String, Handler>();
 
@@ -25,6 +30,7 @@ public class QLog
 
     private void checkPreConditions()
     {
+        LOG.info( "Check Pre Conditions for QLog" );
         String[] propertiesToCheck = { CommonConstants.APPLICATION.HANDLERS, CommonConstants.APPLICATION.LINES_AFTER,
             CommonConstants.APPLICATION.LINES_BEFORE };
         for ( String property : propertiesToCheck ) {
@@ -32,6 +38,7 @@ public class QLog
                 throw new PropertyDoesNotExist( "Property " + property + " must be defined" );
             }
         }
+        LOG.info( "Check complete" );
     }
 
 
@@ -65,6 +72,7 @@ public class QLog
 
         List<String> handlers = Configurations.getStringOrList( CommonConstants.APPLICATION.HANDLERS );
         for ( String handlerName : handlers ) {
+            LOG.info( "Found Handler {}", handlerName );
             qlog.addHandler( handlerName, new Handler( handlerName ) );
             qlog.startHandler( handlerName );
         }
